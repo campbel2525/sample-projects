@@ -13,16 +13,16 @@ down: ## 開発down
 	docker compose -p $(pn) down
 
 shell: ## dockerのshellに入る
-	docker compose -p $(pn) exec app bash
+	docker compose -p $(pn) exec python bash
 
 check: ## コードのフォーマット
-	docker compose -p $(pn) exec -it app pipenv run isort .
-	docker compose -p $(pn) exec -it app pipenv run black .
-	docker compose -p $(pn) exec -it app pipenv run flake8 .
-	docker compose -p $(pn) exec -it app pipenv run mypy .
+	docker compose -p $(pn) exec -it python pipenv run isort .
+	docker compose -p $(pn) exec -it python pipenv run black .
+	docker compose -p $(pn) exec -it python pipenv run flake8 .
+	docker compose -p $(pn) exec -it python pipenv run mypy .
 
 install:
-	docker compose -p $(pn) exec -it app pipenv install --dev
+	docker compose -p $(pn) exec -it python pipenv install --dev
 
 
 destroy: ## 環境削除

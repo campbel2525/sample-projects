@@ -12,10 +12,12 @@ services:
       - ./python:/project
     env_file:
       - ./python/.env
+    environment:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
 
   langflow:
-    image: langflowai/langflow:latest
-    container_name: langflow
+    image: langflowai/langflow:1.6.4
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,14 +26,15 @@ services:
     environment:
       LANGFLOW_PORT: 7860
       LANGFLOW_HOST: 0.0.0.0
-      LANGFLOW_AUTO_LOGIN: "True" # ローカルは気軽にオートログイン（本番では必ずFalse）
+      # ローカルは気軽にオートログイン（本番では必ずFalse）
+      LANGFLOW_AUTO_LOGIN: "True"
       # 必要になったら後でFalseにして下2つを使う
       LANGFLOW_SUPERUSER: "admin"
       LANGFLOW_SUPERUSER_PASSWORD: "test1234"
       # セッション暗号鍵（ローカルでもなるべく長い文字列に）
       LANGFLOW_SECRET_KEY: "langflow-secret-key"
-      # Postgresを使って完全永続化
-      LANGFLOW_DATABASE_URL: "postgresql://langflow:langflow@secret:5432/langflow"
+      # Postgresを使って完全永続化（※ 修正：パスワード/ホスト名）
+      LANGFLOW_DATABASE_URL: "postgresql://langflow:secret@postgres:5432/langflow"
       LANGFLOW_CONFIG_DIR: /app/langflow
       LANGFLOW_LOG_LEVEL: INFO
       # 例: 使うならコメントアウト解除（ローカルのflowsを読み込み）
@@ -43,7 +46,6 @@ services:
 
   postgres:
     image: postgres:16
-    container_name: langflow-postgres
     environment:
       POSTGRES_USER: langflow
       POSTGRES_PASSWORD: secret
