@@ -1,0 +1,18 @@
+{
+  "name": "migration",
+  "version": "1.0.0",
+  "scripts": {
+    "seed": "ts-node commands/run-seed.ts",
+    "migrate": "ts-node commands/run-migration.ts"
+  },
+  "dependencies": {
+    "@my-monorepo/db": "*",
+    "@my-monorepo/factories": "*"
+  },
+  "devDependencies": {},
+  "ts-node": {
+    "esm": {
+      "experimentalSpecifierResolution": "node"
+    }
+  }
+}

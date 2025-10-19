@@ -1,0 +1,62 @@
+version: "3"
+services:
+  python:
+    restart: "no"
+    tty: true
+    build:
+      context: ./
+      dockerfile: docker/Dockerfile.python
+    ports:
+      - "127.0.0.1:9003:9003" # デバッグ用
+    volumes:
+      - ./python:/project
+    env_file:
+      - ./python/.env
+
+  langflow:
+    image: langflowai/langflow:latest
+    container_name: langflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "7860:7860" # http://localhost:7860
+    environment:
+      LANGFLOW_PORT: 7860
+      LANGFLOW_HOST: 0.0.0.0
+      LANGFLOW_AUTO_LOGIN: "True" # ローカルは気軽にオートログイン（本番では必ずFalse）
+      # 必要になったら後でFalseにして下2つを使う
+      LANGFLOW_SUPERUSER: "admin"
+      LANGFLOW_SUPERUSER_PASSWORD: "test1234"
+      # セッション暗号鍵（ローカルでもなるべく長い文字列に）
+      LANGFLOW_SECRET_KEY: "langflow-secret-key"
+      # Postgresを使って完全永続化
+      LANGFLOW_DATABASE_URL: "postgresql://langflow:langflow@secret:5432/langflow"
+      LANGFLOW_CONFIG_DIR: /app/langflow
+      LANGFLOW_LOG_LEVEL: INFO
+      # 例: 使うならコメントアウト解除（ローカルのflowsを読み込み）
+      # LANGFLOW_LOAD_FLOWS_PATH: /app/langflow-flows
+    volumes:
+      - langflow-data:/app/langflow
+      # - ./flows:/app/langflow-flows  # 任意
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: langflow-postgres
+    environment:
+      POSTGRES_USER: langflow
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: langflow
+    volumes:
+      - langflow-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langflow -d langflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  langflow-data:
+  langflow-postgres:

@@ -1,0 +1,10 @@
+# providerのプロファイル名
+aws_default_profile = "aws-stg"
+
+# db
+db_name          = "db"
+db_init_password = "password"
+
+# github
+github_fingerprint = "7560d6f40fa55195f740ee2b1b7c0b4836cbe103" # 小文字に変換すること
+github_subject     = "" # repo:<GitHubのアカウント名>/<リポジトリ名>:environment:<branch名>

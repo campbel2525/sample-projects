@@ -1,0 +1,12 @@
+{
+  "extends": "../../packages/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@my-monorepo/*": ["../../packages/*"]
+    }
+  },
+  "include": ["prisma/**/*.ts", "seeders/**/*.ts", "commands/**/*.ts"],
+  "exclude": ["node_modules"]
+}

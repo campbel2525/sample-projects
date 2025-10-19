@@ -1,0 +1,152 @@
+  # # Lambda版のマイグレーション実行（参考用にコメントアウト）
+  # run-migration-lambda:
+  #   environment: ${{ github.ref_name }}
+  #   name: 🛠️ Execute Database Migration via Lambda
+  #   needs: [
+  #     setup,
+  #     build-push-migration
+  #   ]
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: ${{ vars.IAM_ROLE }}
+  #         aws-region: ${{ needs.setup.outputs.aws-region }}
+
+  #     - name: Update Migration Lambda Function
+  #       run: |
+  #         echo "🔄 Updating Lambda function with new migration image..."
+
+  #         aws lambda update-function-code \
+  #           --function-name "${{ vars.MIGRATION_LAMBDA_FUNCTION_NAME }}" \
+  #           --image-uri "${{ needs.build-push-migration.outputs.migration-image-uri }}"
+
+  #     - name: Wait for Lambda Function Ready State
+  #       run: |
+  #         echo "⏳ Waiting for Lambda function to be ready..."
+
+  #         for i in $(seq 1 30); do
+  #           STATE=$(aws lambda get-function \
+  #             --function-name "${{ vars.MIGRATION_LAMBDA_FUNCTION_NAME }}" \
+  #             --query 'Configuration.State' --output text)
+
+  #           echo "📊 Current state: $STATE (attempt $i/30)"
+
+  #           case "$STATE" in
+  #             "Active")
+  #               echo "✅ Lambda function is ready"
+  #               exit 0
+  #               ;;
+  #             "Failed")
+  #               echo "❌ Lambda function update failed"
+  #               exit 1
+  #               ;;
+  #           esac
+
+  #           if [ $i -eq 30 ]; then
+  #             echo "❌ Timeout waiting for Lambda function to be ready"
+  #             exit 1
+  #           fi
+
+  #           sleep 10
+  #         done
+
+  #     - name: Execute Database Migration
+  #       run: |
+  #         echo "🚀 Invoking Lambda function for database migration..."
+
+  #         INVOKE_RESULT=$(aws lambda invoke \
+  #           --function-name "${{ vars.MIGRATION_LAMBDA_FUNCTION_NAME }}" \
+  #           --invocation-type RequestResponse \
+  #           --payload '{}' \
+  #           --cli-read-timeout 300 \
+  #           response.json 2>&1)
+
+  #         # Check if invoke command itself failed
+  #         INVOKE_EXIT_CODE=$?
+  #         if [ $INVOKE_EXIT_CODE -ne 0 ]; then
+  #           echo "❌ Lambda invoke command failed with exit code: $INVOKE_EXIT_CODE"
+  #           echo "Error output: $INVOKE_RESULT"
+  #           exit 1
+  #         fi
+
+  #         # Validate response file exists
+  #         if [ ! -f response.json ]; then
+  #           echo "❌ Response file not created"
+  #           exit 1
+  #         fi
+
+  #         echo "📋 Lambda response:"
+  #         cat response.json
+
+  #     - name: Validate Migration Results
+  #       run: |
+  #         # Check for Lambda function errors
+  #         if grep -q '"FunctionError"' response.json || grep -q '"errorType"' response.json; then
+  #           echo "❌ Lambda function execution error detected"
+
+  #           # Extract error details
+  #           FUNCTION_ERROR=$(jq -r '.FunctionError // "Unknown"' response.json 2>/dev/null || echo "Unknown")
+  #           ERROR_TYPE=$(jq -r '.errorType // "Unknown"' response.json 2>/dev/null || echo "Unknown")
+  #           ERROR_MESSAGE=$(jq -r '.errorMessage // "Unknown"' response.json 2>/dev/null || echo "Unknown")
+
+  #           echo "Function Error Type: $FUNCTION_ERROR"
+  #           echo "Error Type: $ERROR_TYPE"
+  #           echo "Error Message: $ERROR_MESSAGE"
+
+  #           # Fetch CloudWatch logs for debugging
+  #           echo "🔍 Fetching recent CloudWatch logs..."
+  #           aws logs describe-log-streams \
+  #             --log-group-name "/aws/lambda/${{ vars.MIGRATION_LAMBDA_FUNCTION_NAME }}" \
+  #             --order-by LastEventTime \
+  #             --descending \
+  #             --max-items 1 \
+  #             --query 'logStreams[0].logStreamName' \
+  #             --output text > latest_log_stream.txt
+
+  #           if [ -s latest_log_stream.txt ]; then
+  #             LATEST_STREAM=$(cat latest_log_stream.txt)
+  #             echo "📋 Recent CloudWatch logs from stream: $LATEST_STREAM"
+  #             aws logs get-log-events \
+  #               --log-group-name "/aws/lambda/${{ vars.MIGRATION_LAMBDA_FUNCTION_NAME }}" \
+  #               --log-stream-name "$LATEST_STREAM" \
+  #               --start-time $(date -d '5 minutes ago' +%s)000 \
+  #               --query 'events[*].message' \
+  #               --output text || echo "Could not fetch logs"
+  #           fi
+
+  #           exit 1
+  #         fi
+
+  #         # Extract status code from response
+  #         STATUS_CODE=$(jq -r '.statusCode // empty' response.json 2>/dev/null)
+
+  #         # Check for application-level errors
+  #         if [ "$STATUS_CODE" = "500" ]; then
+  #           echo "❌ Migration failed with status code 500"
+  #           ERROR_MESSAGE=$(jq -r '.body | fromjson | .error // "Unknown error"' response.json 2>/dev/null || echo "Unknown error")
+  #           echo "Error message: $ERROR_MESSAGE"
+  #           exit 1
+  #         fi
+
+  #         # Validate successful completion
+  #         if [ "$STATUS_CODE" = "200" ]; then
+  #           echo "✅ Migration completed successfully"
+  #           SUCCESS_MESSAGE=$(jq -r '.body | fromjson | .message // "Migration completed"' response.json 2>/dev/null || echo "Migration completed")
+  #           echo "Success message: $SUCCESS_MESSAGE"
+  #           echo "🎉 Database migration finished successfully!"
+  #         else
+  #           echo "⚠️ Unexpected response format or status code: $STATUS_CODE"
+  #           echo "Response content:"
+  #           cat response.json
+
+  #           # If we can't determine the status code but there's no error, assume success
+  #           if [ -z "$STATUS_CODE" ] && ! grep -q '"FunctionError"' response.json && ! grep -q '"errorType"' response.json; then
+  #             echo "🤔 Unable to parse status code, but no errors detected. Assuming success."
+  #             echo "✅ Migration likely completed successfully"
+  #           else
+  #             exit 1
+  #           fi
+  #         fi

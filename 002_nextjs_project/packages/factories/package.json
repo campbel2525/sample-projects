@@ -1,0 +1,16 @@
+{
+  "name": "@my-monorepo/factories",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./user_factory.ts",
+  "exports": {
+    "./user_factory": "./user_factory.ts"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.4.1",
+    "@my-monorepo/db": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2"
+  }
+}

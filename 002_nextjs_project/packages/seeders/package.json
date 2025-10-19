@@ -1,0 +1,13 @@
+{
+  "name": "@my-monorepo/seeders",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./user_seeder.ts",
+  "exports": {
+    "./user_seeder": "./user_seeder.ts"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.4.1",
+    "@my-monorepo/db": "*"
+  }
+}

@@ -1,0 +1,79 @@
+# docker/local/docker-compose.yml
+
+version: "3.8"
+
+services:
+  # ---------------------------------
+  # database
+  # ---------------------------------
+  db:
+    image: mysql/mysql-server:8.0
+    platform: linux/amd64
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+    volumes:
+      - db-data80:/var/lib/mysql
+    ports:
+      - "3308:3306"
+    networks:
+      - shared-network
+
+  # ---------------------------------
+  # migration
+  # ---------------------------------
+  migration:
+    restart: "no"
+    tty: true
+    build:
+      context: ../../
+      dockerfile: ./docker/local/migration/Dockerfile
+    env_file:
+      - ../../apps/migration/.env
+    volumes:
+      - ../../apps/migration:/project/apps/migration
+      - ../../packages:/project/packages
+      - ../../package.json:/project/package.json
+      - ../../package-lock.json:/project/package-lock.json
+      - ../../eslint.config.mjs:/project/eslint.config.mjs
+      - ../../tsconfig.json:/project/tsconfig.json
+      # - /project/node_modules
+    working_dir: /project
+    networks:
+      - shared-network
+    depends_on:
+      - db
+
+  # ---------------------------------
+  # user_front
+  # ---------------------------------
+  user_front:
+    restart: "no"
+    tty: true
+    build:
+      context: ../../
+      dockerfile: ./docker/local/user_front/Dockerfile
+    env_file:
+      - ../../apps/user_front/.env
+    ports:
+      - "3001:3001"
+
+    volumes:
+      - ../../apps/user_front:/project/apps/user_front
+      - ../../packages:/project/packages
+      - ../../package.json:/project/package.json
+      - ../../package-lock.json:/project/package-lock.json
+      - ../../eslint.config.mjs:/project/eslint.config.mjs
+      - ../../tsconfig.json:/project/tsconfig.json
+      # - /project/node_modules
+    working_dir: /project
+    networks:
+      - shared-network
+    depends_on:
+      - db
+
+volumes:
+  db-data80:
+
+networks:
+  shared-network:
+    name: ${PROJECT_NAME}-network

@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ESNext", // 最新のJavaScript機能をターゲット
+    "module": "ESNext", // ES Modules (import/export) を出力
+    "moduleResolution": "Bundler", // ★ モジュール解決の戦略。これが重要です。
+    "lib": ["ESNext", "DOM", "DOM.Iterable"], // 利用する標準ライブラリ
+    "allowJs": true, // JavaScript ファイルもプログラムの一部として許可
+    "skipLibCheck": true, // 依存ライブラリの型チェックをスキップ（ビルド時間短縮、エラー抑制）
+    "strict": true, // 全ての厳格な型チェックオプションを有効化
+    "noEmit": true, // TypeScript コンパイラはJSファイルを出力しない（ビルドはNext.jsなどが担当）
+    "esModuleInterop": true, // CommonJSとES Modulesの相互運用性を向上
+    "forceConsistentCasingInFileNames": true, // ファイル名の大文字小文字の一貫性を強制
+    "isolatedModules": true, // 各ファイルを独立したモジュールとして扱う
+    "jsx": "react-jsx", // JSX の処理方法を 'react-jsx' に設定（Next.js App Router 向け）
+    "baseUrl": ".", // モジュール解決の基準パスをルートに設定
+    "paths": {
+      // パスエイリアスの定義
+      "@my-monorepo/*": ["./packages/*"], // @my-monorepo/db などを解決
+      "@/*": ["./apps/user_front/src/*"] // user_front の @/ エイリアスを解決
+    }
+  },
+  "include": [
+    "**/*.ts", // 全てのTypeScriptファイル
+    "**/*.tsx", // 全てのTSXファイル
+    "**/*.js", // 全てのJavaScriptファイル
+    "**/*.jsx", // 全てのJSXファイル
+    "eslint.config.mjs" // ESLint 設定ファイルも型チェックの対象に含める
+  ],
+  "exclude": [
+    "node_modules", // 全ての node_modules ディレクトリを除外
+    "dist", // 全ての dist/ ディレクトリを除外
+    ".next", // 全ての .next/ ディレクトリを除外
+    "build", // 全ての build/ ディレクトリを除外
+    "coverage", // 全ての coverage/ ディレクトリを除外
+    "**/node_modules", // 各ワークスペース内の node_modules も除外
+    "**/dist", // 各ワークスペース内の dist/ も除外
+    "**/build", // 各ワークスペース内の build/ も除外
+    "**/.next" // 各ワークスペース内の .next/ も除外
+  ]
+}

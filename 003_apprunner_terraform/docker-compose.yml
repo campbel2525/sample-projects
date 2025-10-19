@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  terraform:
+    restart: "no"
+    tty: true
+    platform: linux/amd64
+    privileged: true # dockerコンテナ内でdockerを実行するために必要
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./src:/project
+      - ./credentials/aws/config:/root/.aws/config
+      # - /var/run/docker.sock:/var/run/docker.sock # ★追加
+    working_dir: /project

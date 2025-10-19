@@ -1,0 +1,391 @@
+name: CI/CD Pipeline Build → ECR → Batch Migration → App Runner
+
+on:
+  push:
+    branches:
+      - stg
+      - prod
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # 共通セットアップ: AWS認証とECRログイン
+  setup:
+    environment: ${{ github.ref_name }}
+    name: 🔧 Setup AWS & ECR
+    runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.ecr-login.outputs.registry }}
+      aws-region: ${{ vars.AWS_REGION }}
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.IAM_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+  # # ユーザーフロントのDockerビルド＆プッシュ
+  build-push-user-front:
+    environment: ${{ github.ref_name }}
+    name: 🏗️ Build & Push User Front
+    needs: [setup]
+    runs-on: ubuntu-latest
+    outputs:
+      image-uri: ${{ steps.push-image.outputs.image-uri }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.IAM_ROLE }}
+          aws-region: ${{ needs.setup.outputs.aws-region }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ needs.setup.outputs.aws-region }} | \
+          docker login --username AWS --password-stdin ${{ needs.setup.outputs.registry }}
+
+      - name: Build & Push User Front Docker Image
+        id: push-image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          REGISTRY=${{ needs.setup.outputs.registry }}
+          REPO_NAME=${{ vars.USER_FRONT_ECR_REPOSITORY_NAME }}
+
+          # Build image with SHA tag
+          URI_SHA=${REGISTRY}/${REPO_NAME}:${IMAGE_TAG}
+          URI_LATEST=${REGISTRY}/${REPO_NAME}:latest
+
+          echo "🏗️ Building Docker image (includes npm install & build)..."
+          docker build -t $URI_SHA -f docker/github_action/user_front/Dockerfile .
+
+          echo "🏷️ Tagging image as latest..."
+          docker tag $URI_SHA $URI_LATEST
+
+          echo "📤 Pushing images to ECR..."
+          docker push $URI_SHA
+          docker push $URI_LATEST
+
+          echo "✅ Successfully pushed tags: $IMAGE_TAG, latest"
+          echo "image-uri=$URI_SHA" >> $GITHUB_OUTPUT
+
+  # マイグレーションのDockerビルド＆プッシュ
+  build-push-migration:
+    environment: ${{ github.ref_name }}
+    name: 🗄️ Build & Push Migration
+    needs: [setup]
+    runs-on: ubuntu-latest
+    outputs:
+      migration-image-uri: ${{ steps.push-migration.outputs.migration-image }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.IAM_ROLE }}
+          aws-region: ${{ needs.setup.outputs.aws-region }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ needs.setup.outputs.aws-region }} | \
+          docker login --username AWS --password-stdin ${{ needs.setup.outputs.registry }}
+
+      - name: Build & Push Migration Docker Image
+        id: push-migration
+        run: |
+          echo "🏗️ Building migration Docker image (includes npm install & prisma generate)..."
+
+          # Build migration image with SHA tag
+          MIGRATION_IMAGE_SHA="${{ needs.setup.outputs.registry }}/${{ vars.MIGRATION_ECR_REPOSITORY_NAME }}:${{ github.sha }}"
+          MIGRATION_IMAGE_LATEST="${{ needs.setup.outputs.registry }}/${{ vars.MIGRATION_ECR_REPOSITORY_NAME }}:latest"
+
+          docker build -t $MIGRATION_IMAGE_SHA -f docker/github_action/migration/Dockerfile .
+
+          echo "🏷️ Tagging migration image as latest..."
+          docker tag $MIGRATION_IMAGE_SHA $MIGRATION_IMAGE_LATEST
+
+          echo "📤 Pushing migration images to ECR..."
+          docker push $MIGRATION_IMAGE_SHA
+          docker push $MIGRATION_IMAGE_LATEST
+
+          echo "✅ Successfully pushed migration tags: ${{ github.sha }}, latest"
+          echo "migration-image=$MIGRATION_IMAGE_SHA" >> $GITHUB_OUTPUT
+
+  # データベースマイグレーションの実行（AWS Batch）
+  run-migration:
+    environment: ${{ github.ref_name }}
+    name: 🛠️ Execute Database Migration via AWS Batch
+    needs: [
+      setup,
+      # build-push-user-front,
+      build-push-migration
+    ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.IAM_ROLE }}
+          aws-region: ${{ needs.setup.outputs.aws-region }}
+
+      - name: Submit Migration Batch Job
+        id: submit-job
+        run: |
+          echo "🚀 Submitting AWS Batch job for database migration..."
+
+          JOB_NAME="migration-job-${{ github.sha }}-$(date +%s)"
+          IMAGE_URI="${{ needs.build-push-migration.outputs.migration-image-uri }}"
+
+          echo "📋 Job Name: $JOB_NAME"
+          echo "📋 Image URI: $IMAGE_URI"
+
+          # Submit batch job with migration command override and environment variables
+          JOB_ID=$(aws batch submit-job \
+            --job-name "$JOB_NAME" \
+            --job-queue "${{ vars.MIGRATION_BATCH_JOB_QUEUE_NAME }}" \
+            --job-definition "${{ vars.MIGRATION_BATCH_JOB_DEFINITION_NAME }}" \
+            --parameters image="$IMAGE_URI" \
+            --container-overrides '{
+              "command":["npx","prisma","migrate","deploy","--schema=./packages/db/prisma/schema.prisma"]
+            }' \
+            --query 'jobId' --output text)
+
+          echo "📋 Job ID: $JOB_ID"
+          echo "job-id=$JOB_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for Batch Job Completion
+        run: |
+          JOB_ID="${{ steps.submit-job.outputs.job-id }}"
+          echo "⏳ Waiting for Batch job completion... (Job ID: $JOB_ID)"
+
+          # Wait for job completion (max 30 minutes)
+          for i in $(seq 1 180); do
+            JOB_STATUS=$(aws batch describe-jobs \
+              --jobs "$JOB_ID" \
+              --query 'jobs[0].status' --output text)
+
+            echo "📊 Current job status: $JOB_STATUS (attempt $i/180)"
+
+            case "$JOB_STATUS" in
+              "SUCCEEDED")
+                echo "✅ Batch job completed successfully"
+                exit 0
+                ;;
+              "FAILED")
+                echo "❌ Batch job failed"
+
+                # Get failure reason
+                FAILURE_REASON=$(aws batch describe-jobs \
+                  --jobs "$JOB_ID" \
+                  --query 'jobs[0].statusReason' --output text)
+                echo "Failure reason: $FAILURE_REASON"
+
+                exit 1
+                ;;
+              "RUNNING"|"RUNNABLE"|"PENDING"|"SUBMITTED"|"STARTING")
+                # Job is still in progress
+                ;;
+              *)
+                echo "❌ Unexpected job status: $JOB_STATUS"
+                exit 1
+                ;;
+            esac
+
+            if [ $i -eq 180 ]; then
+              echo "❌ Timeout waiting for job completion (30 minutes)"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+      - name: Fetch Migration Logs
+        run: |
+          JOB_ID="${{ steps.submit-job.outputs.job-id }}"
+          echo "📋 Fetching CloudWatch logs for job: $JOB_ID"
+
+          # Get log stream name
+          LOG_STREAM=$(aws batch describe-jobs \
+            --jobs "$JOB_ID" \
+            --query 'jobs[0].attempts[0].taskProperties.containers[0].logStreamName' --output text)
+
+          if [ "$LOG_STREAM" != "null" ] && [ -n "$LOG_STREAM" ]; then
+            echo "📋 Log stream: $LOG_STREAM"
+
+            # Fetch logs
+            aws logs get-log-events \
+              --log-group-name "/aws/batch/job" \
+              --log-stream-name "$LOG_STREAM" \
+              --query 'events[*].message' \
+              --output text || echo "Could not fetch logs"
+          else
+            echo "⚠️ Log stream not found or job still initializing"
+          fi
+
+      - name: Validate Migration Success
+        run: |
+          JOB_ID="${{ steps.submit-job.outputs.job-id }}"
+
+          # Final status check
+          FINAL_STATUS=$(aws batch describe-jobs \
+            --jobs "$JOB_ID" \
+            --query 'jobs[0].status' --output text)
+
+          if [ "$FINAL_STATUS" = "SUCCEEDED" ]; then
+            echo "✅ Migration completed successfully"
+            echo "🎉 Database migration finished successfully!"
+          else
+            echo "❌ Migration failed with status: $FINAL_STATUS"
+            exit 1
+          fi
+
+  # App Runnerへのデプロイ
+  deploy-app-runner:
+    environment: ${{ github.ref_name }}
+    name: 🚀 Deploy to App Runner
+    needs: [
+      setup,
+      build-push-user-front,
+      # build-push-migration,
+      # run-migration
+    ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.IAM_ROLE }}
+          aws-region: ${{ needs.setup.outputs.aws-region }}
+
+      - name: Update App Runner Service
+        id: deploy-service
+        run: |
+          SERVICE_ARN="${{ vars.USER_FRONT_APPRUNNER_ARN }}"
+          IMAGE_URI="${{ needs.build-push-user-front.outputs.image-uri }}"
+
+          echo "🔍 SERVICE_ARN: $SERVICE_ARN"
+          echo "🔍 IMAGE_URI: $IMAGE_URI"
+
+          # Validate required variables
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "❌ SERVICE_ARN is empty. Please check the USER_FRONT_APPRUNNER_ARN variable."
+            exit 1
+          fi
+
+          if [ -z "$IMAGE_URI" ]; then
+            echo "❌ IMAGE_URI is empty. Please check the previous build step."
+            exit 1
+          fi
+
+          SOURCE_CONFIGURATION="{\"ImageRepository\":{\"ImageIdentifier\":\"$IMAGE_URI\",\"ImageRepositoryType\":\"ECR\"}}"
+          echo "🔍 SOURCE_CONFIGURATION: $SOURCE_CONFIGURATION"
+
+          # Update the service with new image
+          OPERATION_ID=$(aws apprunner update-service \
+            --service-arn "$SERVICE_ARN" \
+            --source-configuration "$SOURCE_CONFIGURATION" \
+            --query 'OperationId' --output text)
+
+          echo "🔍 OPERATION_ID: $OPERATION_ID"
+
+          # Validate operation ID
+          if [ -z "$OPERATION_ID" ] || [ "$OPERATION_ID" = "null" ]; then
+            echo "❌ Failed to get OPERATION_ID from update-service command."
+            exit 1
+          fi
+
+          echo "operation-id=$OPERATION_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for Deployment Completion
+        run: |
+          SERVICE_ARN="${{ vars.USER_FRONT_APPRUNNER_ARN }}"
+          OPERATION_ID="${{ steps.deploy-service.outputs.operation-id }}"
+
+          echo "⏳ Waiting for deployment to complete... (Operation ID: $OPERATION_ID)"
+
+          # Wait for deployment to complete
+          for i in $(seq 1 60); do
+            SERVICE_STATUS=$(aws apprunner describe-service \
+              --service-arn "$SERVICE_ARN" \
+              --query 'Service.Status' --output text)
+
+            echo "📊 Current service status: $SERVICE_STATUS (attempt $i/60)"
+
+            case "$SERVICE_STATUS" in
+              "RUNNING")
+                echo "✅ Service is running. Waiting for stability..."
+                sleep 30  # Wait for service to stabilize
+
+                # Verify service is still running
+                FINAL_STATUS=$(aws apprunner describe-service \
+                  --service-arn "$SERVICE_ARN" \
+                  --query 'Service.Status' --output text)
+
+                echo "📊 Final service status: $FINAL_STATUS"
+
+                if [ "$FINAL_STATUS" = "RUNNING" ]; then
+                  echo "✅ Deployment succeeded and service is stable."
+                  exit 0
+                else
+                  echo "❌ Service became unstable after initial success."
+                  exit 1
+                fi
+                ;;
+              "CREATE_FAILED"|"UPDATE_FAILED"|"DELETE_FAILED")
+                echo "❌ Deployment failed with status: $SERVICE_STATUS"
+                aws apprunner describe-service --service-arn "$SERVICE_ARN" \
+                  --query 'Service.ServiceUrl' --output text || echo "No service URL available"
+                exit 1
+                ;;
+            esac
+
+            if [ $i -eq 60 ]; then
+              echo "❌ Timeout waiting for deployment. Final status: $SERVICE_STATUS"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+      - name: Verify Deployed Image
+        run: |
+          SERVICE_ARN="${{ vars.USER_FRONT_APPRUNNER_ARN }}"
+          EXPECTED_IMAGE_URI="${{ needs.build-push-user-front.outputs.image-uri }}"
+
+          # Allow time for service description to reflect new image
+          sleep 5
+
+          CURRENT_IMAGE_URI=$(aws apprunner describe-service \
+            --service-arn "$SERVICE_ARN" | \
+            jq -r '.Service.SourceConfiguration.ImageRepository.ImageIdentifier')
+
+          echo "🔍 Expected Image: $EXPECTED_IMAGE_URI"
+          echo "🔍 Deployed Image: $CURRENT_IMAGE_URI"
+
+          if [ "$CURRENT_IMAGE_URI" != "$EXPECTED_IMAGE_URI" ]; then
+            echo "❌ Deployed image does not match expected tag."
+            exit 1
+          fi
+
+          echo "✅ Deployed image matches expected tag."
+          echo "🎉 Deployment completed successfully!"
