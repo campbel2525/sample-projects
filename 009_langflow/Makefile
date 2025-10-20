@@ -12,17 +12,24 @@ up: ## 開発立ち上げ
 down: ## 開発down
 	docker compose -p $(pn) down
 
-shell: ## dockerのshellに入る
-	docker compose -p $(pn) exec python bash
+restart: ## 開発再起動
+	make down
+	make up
+
+mcp-shell: ## dockerのshellに入る
+	docker compose -p $(pn) exec mcp bash
+
+langflow-shell: ## dockerのshellに入る
+	docker compose -p $(pn) exec langflow bash
 
 check: ## コードのフォーマット
-	docker compose -p $(pn) exec -it python pipenv run isort .
-	docker compose -p $(pn) exec -it python pipenv run black .
-	docker compose -p $(pn) exec -it python pipenv run flake8 .
-	docker compose -p $(pn) exec -it python pipenv run mypy .
+	docker compose -p $(pn) exec -it mcp pipenv run isort .
+	docker compose -p $(pn) exec -it mcp pipenv run black .
+	docker compose -p $(pn) exec -it mcp pipenv run flake8 .
+	docker compose -p $(pn) exec -it mcp pipenv run mypy .
 
 install:
-	docker compose -p $(pn) exec -it python pipenv install --dev
+	docker compose -p $(pn) exec -it mcp pipenv install --dev
 
 
 destroy: ## 環境削除
@@ -35,3 +42,6 @@ push:
 	git add .
 	git commit -m "Commit at $$(date +'%Y-%m-%d %H:%M:%S')"
 	git push origin head
+
+mcp-run:
+	docker compose -p $(pn) exec -it mcp pipenv run python main.py

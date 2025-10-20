@@ -1,6 +1,7 @@
 .env
-.env.prod
-.env.testing
+.env.*
+!.env.mcp.example
+!.env.langflow.example
 *.pyc
 __pycache__
 .python-version
