@@ -1,12 +1,12 @@
-# Overview
+# 概要
 
-This is a collection of programs I've created during my daily study.
+これは私が日々の勉強で作成したプログラムです。
 
-Until now, these were separate repositories, but as the number of programs has grown, I've consolidated them into one repository for easier viewing.
+これまでは別々のリポジトリでしたが、プログラム数が増えてきたため、見やすくするために1つのリポジトリに統合しました。
 
-Each folder contains sample code.
+各フォルダにはサンプルコードが含まれています。
 
-For detailed instructions, please see the README.md file in each folder.
+詳しい手順については、各フォルダ内のREADME.mdファイルをご覧ください。
 
 # プロジェクトの概要
 
