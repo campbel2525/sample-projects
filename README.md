@@ -1,36 +1,30 @@
 # 概要
 
-これは私が日々の勉強で作成したプログラムです。
-
-これまでは別々のリポジトリでしたが、プログラム数が増えてきたため、見やすくするために1つのリポジトリに統合しました。
-
-各フォルダにはサンプルコードが含まれています。
-
-詳しい手順については、各フォルダ内のREADME.mdファイルをご覧ください。
+これは私が日々の勉強で作成したリポジトリのまとめです
 
 # プロジェクトの概要
 
-- 001_drf_project
+- https://github.com/campbel2525/sample-drf-project
   - フロントエンド、バックエンド、IaC、CICD が同梱されているプロジェクト
   - フロントエンド: Next.js
   - バックエンドエンド: Django Rest Framework
   - IaC: Terraform
-- 002_nextjs_project
+- https://github.com/campbel2525/sample-nextjs-project
   - Next.js の簡単なプログラム
-  - GitHub Actions のワークフローが含まれており、`003_apprunner_terraform`と一緒に使うとインフラ側も実装可能
-- 003_apprunner_terraform
+  - GitHub Actions のワークフローが含まれており、[sample-apprunner-terraform](https://github.com/campbel2525/sample-apprunner-terraform)と一緒に使うとインフラ側も実装可能
+- https://github.com/campbel2525/sample-apprunner-terraform
   - AWS の App Runner を使用して Next.js を動かすインフラのコードを Terraform で実装
-  - `002_nextjs_project` と一緒に使うとよし
-- 004_operator_browser
+  - [sample-nextjs-project](https://github.com/campbel2525/sample-nextjs-project) と一緒に使うとよし
+- https://github.com/campbel2525/sample-operator-browser
   - ブラウザを AI で操作するための仕組み
-- 005_neo4j
+- https://github.com/campbel2525/sample-neo4j
   - Neo4j のサンプルコード
-- 006_ai_agent
+- https://github.com/campbel2525/sample-ai-agent
   - LangGraph を使用した AI エージェントのチャットボット
-- 007_stock_price_prediction_ai_verification
+- https://github.com/campbel2525/sample-stock-price-prediction-ai-verification
   - ゴールドの価格を予想する検証
   - まだ精度が良くない
-- 008_transformers
+- https://github.com/campbel2525/sample-transformers
   - Transformers のサンプルコード
 
 #

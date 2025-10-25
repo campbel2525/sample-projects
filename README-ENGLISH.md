@@ -1,32 +1,28 @@
 # Overview
 
-This repository collects programs I’ve built as part of my daily study.
-
-Each folder contains a sample piece of code.
-
-These used to live in separate repositories, but as the number grew I consolidated them into a single repo to make things easier to browse.
+This is a collection of repositories I created through my daily study.
 
 # Project Overview
 
-- 001_drf_project
-  - A project bundling the frontend, backend, IaC, and CI/CD
+- https://github.com/campbel2525/sample-drf-project
+  - A project that bundles the frontend, backend, IaC, and CI/CD
   - Frontend: Next.js
   - Backend: Django REST Framework
   - IaC: Terraform
-- 002_nextjs_project
+- https://github.com/campbel2525/sample-nextjs-project
   - A simple Next.js application
-  - Includes GitHub Actions; when used together with `003_apprunner_terraform`, you can implement the infrastructure side as well
-- 003_apprunner_terraform
-  - Terraform code for infrastructure that runs a Next.js app on AWS App Runner
-  - Works well in combination with `002_nextjs_project`
-- 004_operator_browser
-  - A system for controlling a browser with AI (AI-driven browser automation)
-- 005_neo4j
+  - Includes a GitHub Actions workflow; when used together with sample-apprunner-terraform, you can also implement the infrastructure side
+- https://github.com/campbel2525/sample-apprunner-terraform
+  - Terraform code for infrastructure that runs Next.js on AWS App Runner
+  - Works well when used together with sample-nextjs-project
+- https://github.com/campbel2525/sample-operator-browser
+  - A system to operate a browser with AI
+- https://github.com/campbel2525/sample-neo4j
   - Sample code for Neo4j
-- 006_ai_agent
+- https://github.com/campbel2525/sample-ai-agent
   - A chatbot AI agent built with LangGraph
-- 007_stock_price_prediction_ai_verification
-  - An experiment to forecast gold prices
-  - Accuracy is not yet satisfactory
-- 008_transformers
-  - Transformer sample code
+- https://github.com/campbel2525/sample-stock-price-prediction-ai-verification
+  - An experiment to predict the price of gold
+  - Accuracy is not yet good
+- https://github.com/campbel2525/sample-transformers
+  - Sample code for Transformers

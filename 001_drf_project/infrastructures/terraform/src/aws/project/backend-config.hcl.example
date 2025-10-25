@@ -1,3 +1,0 @@
-profile = "aws-prod" # 本番、stgで分けること
-bucket  = "" # 本番、stgで分けること
-region  = ""
