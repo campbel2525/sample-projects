@@ -4,6 +4,8 @@
 
 これは私が日々の勉強で作成したリポジトリのまとめです
 
+ポートフォリオになります
+
 # プロジェクトの概要
 
 - https://github.com/campbel2525/sample-drf-project
