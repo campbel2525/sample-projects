@@ -30,5 +30,5 @@
   - まだ精度が良くない
 - https://github.com/campbel2525/sample-transformers
   - Transformers のサンプルコード
-
-#
+- https://github.com/campbel2525/sample-mt5
+  - 株取引のMT5を監視してゴールデンクロスなどをSlackは通知する
