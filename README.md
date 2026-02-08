@@ -23,7 +23,7 @@
   - ブラウザを AI で操作するための仕組み
 - https://github.com/campbel2525/sample-neo4j
   - Neo4j のサンプルコード
-- https://github.com/campbel2525/sample-ai-agent
+- https://github.com/campbel2525/sample-ai-agent-rag
   - LangGraph を使用した AI エージェントのチャットボット
 - https://github.com/campbel2525/sample-stock-price-prediction-ai-verification
   - ゴールドの価格を予想する検証
